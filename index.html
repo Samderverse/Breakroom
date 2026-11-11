@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Breakroom</title>
+<meta name="theme-color" content="#070605">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Special+Elite&family=VT323&display=swap">
+<style>
+/* Layout: one 9:16 tape frame centred in black; the game canvas fills it and
+   every screen sits on top as a camcorder overlay, sized in container units. */
+:root {
+  --void: #070605;      /* the dark around everything */
+  --soot: #15130f;      /* panels */
+  --ink: #e8e0ca;       /* OSD text, off-white like a tape label */
+  --paper: #d9cfb4;     /* deal cards, cassette-label paper */
+  --sodium: #f0a23a;    /* sodium lamp: selection and light */
+  --fluoro: #b6cc84;    /* fluorescent tube: used sparingly */
+  --blood: #c4281d;     /* danger only: costs, the crush line, death */
+  --ash: #8b8373;       /* quiet text */
+  --osd: 'VT323', 'Courier New', monospace;
+  --type: 'Special Elite', 'Courier New', monospace;
+  --shout: 'Anton', 'Impact', 'Arial Narrow', sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; background: var(--void); color: var(--ink); overflow: hidden; }
+body { font-family: var(--osd); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; overscroll-behavior: none; }
+#stage {
+  position: fixed; inset: 0; display: grid; place-items: center; background: var(--void);
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  touch-action: none;
+}
+#frame { position: relative; container-type: size; overflow: hidden; background: #000; touch-action: none; }
+#screen { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+/* scanlines and grain over the HTML layers too, so text sits on the same tape */
+#frame::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,0.16) 3px);
+  mix-blend-mode: multiply;
+}
+.reduce #frame::after { opacity: 0.4; }
+
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible, .card:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+
+/* ---------- on-screen display ---------- */
+#osd { position: absolute; inset: 0; pointer-events: none; z-index: 10; font-size: 5.6cqw; line-height: 1; text-shadow: 1px 0 rgba(255,60,40,0.45), -1px 0 rgba(60,200,255,0.35); }
+#osd .tl { position: absolute; left: 4cqw; top: 3.2cqw; display: flex; gap: 2cqw; align-items: center; }
+#osd .tr { position: absolute; right: 3cqw; top: 2.4cqw; pointer-events: auto; }
+#osd .bl { position: absolute; left: 4cqw; bottom: 2.8cqw; font-variant-numeric: tabular-nums; }
+#osd .tc { position: absolute; left: 0; right: 0; top: 10cqw; text-align: center; font-size: 4.4cqw; color: var(--ash); letter-spacing: 0.08em; }
+.rec { color: var(--ink); }
+.rec i { display: inline-block; width: 2.6cqw; height: 2.6cqw; border-radius: 50%; background: var(--blood); margin-right: 1.4cqw; vertical-align: 0.2cqw; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+#pauseBtn { font-size: 6cqw; padding: 1.4cqw 2.4cqw; letter-spacing: -0.1em; }
+#matchBtn {
+  position: absolute; right: 3cqw; bottom: 2.2cqw; pointer-events: auto; font-size: 5cqw; padding: 1.4cqw 2.6cqw;
+  border: 1px solid rgba(240,162,58,0.6); color: var(--sodium); background: rgba(10,8,6,0.6);
+}
+#matchBtn:active { background: rgba(240,162,58,0.2); }
+#prompt { position: absolute; left: 0; right: 0; bottom: 15cqw; text-align: center; font-size: 5.6cqw; letter-spacing: 0.12em; animation: blink 1.2s steps(1) infinite; }
+
+/* ---------- the Host's voice, as subtitles ---------- */
+#host { position: absolute; left: 6cqw; right: 6cqw; top: 17cqw; z-index: 12; pointer-events: none; display: flex; justify-content: center; }
+#host p {
+  margin: 0; font-family: var(--type); font-size: 4.3cqw; line-height: 1.4; text-align: center; color: var(--ink);
+  background: rgba(5,4,3,0.82); padding: 1.6cqw 3cqw; max-width: 80cqw; text-wrap: balance;
+}
+#host p:empty { display: none; }
+.caret::after { content: "_"; animation: blink 0.7s steps(1) infinite; }
+
+/* ---------- big type ---------- */
+#banner {
+  position: absolute; left: 0; right: 0; top: 44%; transform: translateY(-50%); z-index: 15; pointer-events: none;
+  text-align: center; display: flex; flex-direction: column; gap: 1cqw; align-items: center;
+}
+#banner b {
+  font-family: var(--shout); font-weight: 400; font-size: 17cqw; line-height: 0.92; letter-spacing: 0.01em; text-transform: uppercase;
+  transform: skewX(-7deg) scaleY(1.12); color: var(--ink);
+  text-shadow: 0.7cqw 0 rgba(196,40,29,0.75), -0.7cqw 0 rgba(70,170,220,0.5), 0 0 4cqw rgba(0,0,0,0.9);
+}
+#banner span { font-size: 6cqw; letter-spacing: 0.2em; color: var(--ink); background: rgba(5,4,3,0.75); padding: 0.6cqw 2.4cqw; }
+#banner.danger b { color: var(--blood); text-shadow: 0.7cqw 0 rgba(255,220,200,0.35), 0 0 4cqw rgba(0,0,0,0.9); }
+#banner.show { animation: slam 0.28s cubic-bezier(.2,1.6,.4,1); }
+@keyframes slam { from { transform: translateY(-50%) scale(1.5); opacity: 0; } to { transform: translateY(-50%) scale(1); opacity: 1; } }
+.reduce #banner.show { animation: none; }
+
+/* ---------- full screens ---------- */
+.screen {
+  position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column;
+  padding: 7cqw 7cqw 6cqw; gap: 3cqw; background: rgba(6,5,4,0.78); overflow-y: auto;
+}
+.screen[hidden] { display: none; }
+.osdline { display: flex; justify-content: space-between; font-size: 5cqw; color: var(--ash); letter-spacing: 0.06em; }
+.menu { display: flex; flex-direction: column; gap: 1.4cqw; font-size: 7.4cqw; }
+.menu button { text-align: left; padding: 1.2cqw 2.4cqw; display: flex; justify-content: space-between; letter-spacing: 0.04em; }
+.menu button:hover, .menu button:focus-visible { background: var(--sodium); color: var(--void); outline: none; }
+.menu button.primary { color: var(--sodium); }
+.menu button.primary:hover, .menu button.primary:focus-visible { color: var(--void); }
+.menu button small { font-size: 0.8em; opacity: 0.85; }
+
+/* title */
+#title { justify-content: space-between; background: linear-gradient(to bottom, rgba(6,5,4,0.25), rgba(6,5,4,0.55) 45%, rgba(6,5,4,0.92)); }
+#title h1 {
+  margin: 10cqw 0 0; font-family: var(--shout); font-weight: 400; font-size: 18cqw; line-height: 0.9; white-space: nowrap; letter-spacing: 0.005em;
+  transform: skewX(-7deg) scaleY(1.25); transform-origin: left; color: var(--ink);
+  text-shadow: 0.8cqw 0 rgba(196,40,29,0.7), -0.8cqw 0 rgba(70,170,220,0.45);
+}
+#title .tag { font-family: var(--type); font-size: 4.4cqw; line-height: 1.45; color: var(--ink); margin: 5cqw 0 0; max-width: 72cqw; }
+#title .rules { font-family: var(--type); font-size: 3.6cqw; line-height: 1.5; color: var(--ash); margin: 0; padding: 0; list-style: none; display: grid; gap: 0.6cqw; }
+#title .rules b { color: var(--ink); font-weight: 400; }
+#title footer { display: flex; justify-content: space-between; align-items: end; gap: 3cqw; font-size: 4.4cqw; color: var(--ash); }
+details.credits { font-family: var(--type); font-size: 3.2cqw; line-height: 1.5; color: var(--ash); }
+details.credits summary { font-family: var(--osd); font-size: 4.4cqw; cursor: pointer; list-style: none; }
+details.credits ul { margin: 1.6cqw 0 0; padding: 0; list-style: none; }
+
+/* deal */
+#deal { background: rgba(6,5,4,0.86); justify-content: flex-start; }
+#deal .say { font-family: var(--type); font-size: 4.6cqw; line-height: 1.45; min-height: 14cqw; margin: 0; color: var(--ink); text-wrap: balance; }
+#cards { display: flex; flex-direction: column; gap: 2.6cqw; }
+.card {
+  position: relative; text-align: left; background: var(--paper); color: #1d1a15; padding: 2.6cqw 3.4cqw 2.8cqw 4.4cqw;
+  font-family: var(--type); display: grid; gap: 0.8cqw; border: 0.6cqw solid transparent;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 5.4cqw, rgba(60,80,140,0.18) 5.4cqw, rgba(60,80,140,0.18) calc(5.4cqw + 1px));
+  box-shadow: 0 1cqw 0 rgba(0,0,0,0.5);
+  transform: rotate(var(--tilt, 0deg));
+}
+.card::before { content: ""; position: absolute; left: 1.6cqw; top: 2cqw; bottom: 2cqw; width: 0.6cqw; background: rgba(196,40,29,0.5); }
+.card h3 { margin: 0; font-weight: 400; font-size: 5.6cqw; letter-spacing: 0.04em; text-transform: uppercase; }
+.card p { margin: 0; font-size: 3.9cqw; line-height: 1.35; }
+.card .cost { color: #8e1c14; }
+.card .cost::before { content: "COST  "; font-family: var(--osd); font-size: 1.1em; letter-spacing: 0.05em; }
+.card .boon::before { content: "GET  "; font-family: var(--osd); font-size: 1.1em; letter-spacing: 0.05em; }
+.card.sel { border-color: var(--sodium); transform: rotate(0deg) scale(1.02); }
+.card .hint { font-family: var(--osd); font-size: 4.2cqw; color: #6a5a3c; display: none; }
+.card.sel .hint { display: block; }
+.card[disabled] { opacity: 0.45; cursor: not-allowed; }
+.card[disabled] .hint { display: block; color: #8e1c14; }
+#deal .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; font-size: 5cqw; color: var(--ash); }
+#refuse { font-size: 5.6cqw; padding: 1.4cqw 2.4cqw; border: 1px solid rgba(232,224,202,0.35); color: var(--ink); }
+#refuse:hover, #refuse:focus-visible { background: var(--ink); color: var(--void); outline: none; }
+.bulbs { letter-spacing: 0.1em; }
+.bulbs .on { color: var(--sodium); }
+.bulbs .off { color: #4a443a; }
+
+/* pause and over */
+#pause, #over { justify-content: center; }
+#over h2, #pause h2 {
+  margin: 0; font-family: var(--shout); font-weight: 400; font-size: 20cqw; line-height: 0.95; text-transform: uppercase;
+  transform: skewX(-7deg) scaleY(1.15); transform-origin: left;
+}
+#over h2 { color: var(--blood); text-shadow: 0.8cqw 0 rgba(255,220,200,0.25); }
+#over.win h2 { color: var(--ink); text-shadow: 0.8cqw 0 rgba(196,40,29,0.6), -0.8cqw 0 rgba(70,170,220,0.4); }
+#over .say { font-family: var(--type); font-size: 4.6cqw; line-height: 1.45; margin: 0; min-height: 7cqw; }
+.stats { margin: 2cqw 0; display: grid; grid-template-columns: auto 1fr; gap: 1cqw 4cqw; font-size: 5.6cqw; font-variant-numeric: tabular-nums; }
+.stats dt { color: var(--ash); }
+.stats dd { margin: 0; text-align: right; }
+#pause h2 { color: var(--ink); font-size: 16cqw; }
+#over.win h2 { font-size: 15cqw; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="frame">
+    <canvas id="screen" aria-label="Breakroom game screen"></canvas>
+
+    <div id="osd" hidden>
+      <div class="tl"><span class="rec"><i></i>REC</span></div>
+      <div class="tc" id="where"></div>
+      <div class="tr"><button id="pauseBtn" aria-label="Pause">❚❚</button></div>
+      <div class="bl" id="clock">0:00:00</div>
+      <button id="matchBtn" hidden>MATCH ×3</button>
+      <div id="prompt" hidden>TAP TO LAUNCH</div>
+    </div>
+
+    <div id="host" aria-live="polite"><p></p></div>
+    <div id="banner"></div>
+
+    <section id="title" class="screen" aria-label="Title">
+      <div>
+        <div class="osdline"><span>PLAY ▶</span><span>SP</span></div>
+        <h1>Breakroom</h1>
+        <p class="tag">You are chained to a paddle in a basement. Clear the wall before the ceiling comes down.</p>
+      </div>
+      <ul class="rules">
+        <li><b>Drag</b> to move the paddle. <b>Tap</b> to launch.</li>
+        <li>Drop the ball and a <b>bulb pops</b>. The room gets darker.</li>
+        <li>If the wall reaches the <b>red line</b>, the tape ends.</li>
+        <li>Between rounds the Host offers <b>deals</b>. Every one has a cost.</li>
+      </ul>
+      <div class="menu">
+        <button id="playBtn" class="primary">▶ PLAY</button>
+        <button id="soundBtn">SOUND <small id="soundVal">ON</small></button>
+        <button id="reduceBtn">REDUCE EFFECTS <small id="reduceVal">OFF</small></button>
+      </div>
+      <footer>
+        <details class="credits">
+          <summary>CREDITS</summary>
+          <ul id="credits"></ul>
+        </details>
+        <span id="best"></span>
+      </footer>
+    </section>
+
+    <section id="deal" class="screen" aria-label="The Host's deals" hidden>
+      <div class="osdline"><span id="dealWhere"></span></div>
+      <p class="say" id="dealSay"></p>
+      <div id="cards"></div>
+      <div class="foot">
+        <span class="bulbs" id="dealBulbs"></span>
+        <button id="refuse">REFUSE ALL</button>
+      </div>
+    </section>
+
+    <section id="pause" class="screen" aria-label="Paused" hidden>
+      <div class="osdline"><span>❚❚ PAUSE</span><span id="pauseClock"></span></div>
+      <h2>Paused</h2>
+      <div class="menu">
+        <button id="resumeBtn" class="primary">▶ RESUME</button>
+        <button id="soundBtn2">SOUND <small id="soundVal2">ON</small></button>
+        <button id="reduceBtn2">REDUCE EFFECTS <small id="reduceVal2">OFF</small></button>
+        <button id="quitBtn">QUIT TO TITLE</button>
+      </div>
+    </section>
+
+    <section id="over" class="screen" aria-label="End of tape" hidden>
+      <div class="osdline"><span>■ STOP</span><span id="overClock"></span></div>
+      <h2 id="overTitle">Dead</h2>
+      <p class="say" id="overSay"></p>
+      <dl class="stats" id="overStats"></dl>
+      <div class="menu">
+        <button id="againBtn" class="primary">◀◀ PLAY AGAIN</button>
+        <button id="titleBtn">TITLE</button>
+      </div>
+    </section>
+  </div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
