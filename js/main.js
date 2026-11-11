@@ -57,13 +57,23 @@ function showBest() {
 // ---------- sizing ----------
 
 const fx = createPostFx(el.canvas);
+// Phones get a touch pad under the game; mice and keyboards don't need one.
+const touchFirst = matchMedia('(pointer: coarse)').matches;
+document.documentElement.classList.toggle('has-pad', touchFirst);
+const pad = $('pad');
+const padMark = $('padMark');
+
 function fit() {
-  const w = el.stage.clientWidth - parseFloat(getComputedStyle(el.stage).paddingLeft) - parseFloat(getComputedStyle(el.stage).paddingRight);
-  const h = el.stage.clientHeight - parseFloat(getComputedStyle(el.stage).paddingTop) - parseFloat(getComputedStyle(el.stage).paddingBottom);
-  const fw = Math.floor(Math.min(w, h * 9 / 16));
+  const cs = getComputedStyle(el.stage);
+  const w = el.stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const h = el.stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  // keep at least 15% of the height (and 96px) for the pad on touch screens
+  const padMin = touchFirst ? Math.max(96, h * 0.15) : 0;
+  const fw = Math.floor(Math.min(w, (h - padMin) * 9 / 16));
   const fh = Math.floor(fw * 16 / 9);
   el.frame.style.width = fw + 'px';
   el.frame.style.height = fh + 'px';
+  if (touchFirst) { pad.style.width = fw + 'px'; pad.style.height = Math.floor(h - fh) + 'px'; }
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   el.canvas.width = Math.round(fw * dpr);
   el.canvas.height = Math.round(fh * dpr);
@@ -330,13 +340,13 @@ function fieldX(clientX) {
 }
 
 let ptr = null;
-el.frame.addEventListener('pointerdown', (e) => {
+el.stage.addEventListener('pointerdown', (e) => {
   if (screen !== 'round' || e.target.closest('button')) return;
   ptr = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0, type: e.pointerType };
-  try { el.frame.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+  try { el.stage.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
   if (e.pointerType === 'mouse') G.setPaddleTarget(g, fieldX(e.clientX));
 });
-el.frame.addEventListener('pointermove', (e) => {
+el.stage.addEventListener('pointermove', (e) => {
   if (screen !== 'round') return;
   if (e.pointerType === 'mouse') { G.setPaddleTarget(g, fieldX(e.clientX)); return; }
   if (!ptr || ptr.id !== e.pointerId) return;
@@ -347,13 +357,13 @@ el.frame.addEventListener('pointermove', (e) => {
   // relative drag on touch, so your thumb never has to sit on the paddle
   G.setPaddleTarget(g, g.paddle.target + (dx / r.width) * W * 1.25);
 });
-el.frame.addEventListener('pointerup', (e) => {
+el.stage.addEventListener('pointerup', (e) => {
   if (screen !== 'round' || !ptr || ptr.id !== e.pointerId) return;
   const tap = ptr.moved < 12 && performance.now() - ptr.t < 350;
   ptr = null;
   if (tap && introHold <= 0) G.launch(g);
 });
-el.frame.addEventListener('pointercancel', () => { ptr = null; });
+el.stage.addEventListener('pointercancel', () => { ptr = null; });
 
 window.addEventListener('keydown', (e) => {
   const k = e.key;
@@ -442,6 +452,12 @@ function frame(now) {
     if (showMatch) el.match.textContent = `MATCH ×${g.matchesLeft}`;
     const serving = g.state === 'serve' && introHold <= 0 && !busy;
     el.prompt.hidden = !serving;
+  }
+
+  if (touchFirst) {
+    padMark.style.left = `${6 + (g.paddle.x / W) * 88}%`;
+    padMark.style.width = `${(g.paddle.w / W) * 88}%`;
+    pad.classList.toggle('pad-off', screen !== 'round');
   }
 
   const img = render(g, { reduce: settings.reduce });

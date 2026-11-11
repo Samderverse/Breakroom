@@ -28,11 +28,32 @@
 html, body { height: 100%; margin: 0; background: var(--void); color: var(--ink); overflow: hidden; }
 body { font-family: var(--osd); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; overscroll-behavior: none; }
 #stage {
-  position: fixed; inset: 0; display: grid; place-items: center; background: var(--void);
+  position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--void);
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   touch-action: none;
 }
-#frame { position: relative; container-type: size; overflow: hidden; background: #000; touch-action: none; }
+#frame { position: relative; flex: none; container-type: size; overflow: hidden; background: #000; touch-action: none; }
+/* touch pad: on phones the game pins to the top and the space below becomes the place to drag,
+   so your thumb never sits over the paddle */
+.has-pad #stage { justify-content: flex-start; }
+#pad {
+  position: relative; flex: none; display: none; touch-action: none; overflow: hidden;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.55) 0 3px, transparent 3px 14px),
+    linear-gradient(to bottom, #1a1714, #0b0a08);
+  border-top: 1px solid #2c2722;
+}
+.has-pad #pad { display: block; }
+#pad .rail { position: absolute; left: 6%; right: 6%; top: 38%; height: 2px; background: #2e2924; }
+#pad .mark {
+  position: absolute; top: 38%; height: 6px; margin-top: -2px; transform: translateX(-50%);
+  background: var(--sodium); box-shadow: 0 0 10px rgba(240,162,58,0.6); border-radius: 1px;
+}
+#pad .label {
+  position: absolute; left: 0; right: 0; bottom: 18%; text-align: center; font-family: var(--osd);
+  font-size: 18px; letter-spacing: 0.25em; color: #6f675a;
+}
+#pad.pad-off .mark { opacity: 0.25; }
 #screen { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 /* scanlines and grain over the HTML layers too, so text sits on the same tape */
 #frame::after {
@@ -236,6 +257,7 @@ details.credits ul { margin: 1.6cqw 0 0; padding: 0; list-style: none; }
       </div>
     </section>
   </div>
+  <div id="pad" aria-hidden="true"><div class="rail"></div><div class="mark" id="padMark"></div><div class="label">◀ DRAG HERE ▶</div></div>
 </div>
 <script type="module" src="js/main.js"></script>
 </body>
